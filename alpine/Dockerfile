@@ -7,6 +7,7 @@ ARG VERSION=master
 # Set some default config variables
 ENV DOCKERIZE_VERSION=v0.6.1
 ENV NODE_ENV=production
+ENV UPLOADS_MODE=0700
 
 # Disable PDF export on alpine
 # PhantomJS is broken on alpine and crashes CodiMD

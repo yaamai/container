@@ -43,7 +43,7 @@ gosu codimd node_modules/.bin/sequelize db:migrate
 # Change owner and permission if filesystem backend is used
 if [ "$CMD_IMAGE_UPLOAD_TYPE" = "filesystem" ]; then
     chown -R codimd ./public/uploads
-    chmod 700 ./public/uploads
+    chmod $UPLOADS_MODE ./public/uploads
 fi
 
 # Sleep to make sure everything is fine...
