@@ -1,0 +1,19 @@
+FROM yaamai/codimd-server:alpine-oidc
+LABEL maintainer Yuki Takei <yuki@weseek.co.jp>
+
+# copy script to apply GROWI agent
+USER root
+COPY apply-growi-agent.sh /codimd/apply-growi-agent.sh
+RUN chmod +x /codimd/apply-growi-agent.sh
+# run the script
+RUN /codimd/apply-growi-agent.sh
+
+# overwrite HackMD config file
+# RUN rm -f /files/config.json && rm -f /codimd/config.json
+# COPY deployments/config.json /files/
+# RUN ln -s /files/config.json /codimd/config.json
+
+# create sqlite data dir
+# RUN mkdir /files/sqlite && chown codimd /files/sqlite
+# RUN ln -s /files/sqlite /codimd/sqlite
+USER codimd
