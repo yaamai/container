@@ -1,0 +1,20 @@
+diff --git a/lib/config/environment.js b/lib/config/environment.js
+index 716f8b7..6a24b53 100644
+--- a/lib/config/environment.js
++++ b/lib/config/environment.js
+@@ -130,6 +130,15 @@ module.exports = {
+       email: process.env.CMD_SAML_ATTRIBUTE_EMAIL
+     }
+   },
++  oidc: {
++    issuer: process.env.CMD_OIDC_ISSUER,
++    authorizationURL: process.env.CMD_OIDC_AUTHORIZATIONURL,
++    tokenURL: process.env.CMD_OIDC_TOKENURL,
++    clientID: process.env.CMD_OIDC_CLIENTID,
++    clientSecret: process.env.CMD_OIDC_CLIENTSECRET,
++    userInfoURL: process.env.CMD_OIDC_USERINFOURL,
++    scope: process.env.CMD_OIDC_SCOPE
++  },
+   email: toBooleanConfig(process.env.CMD_EMAIL),
+   allowEmailRegister: toBooleanConfig(process.env.CMD_ALLOW_EMAIL_REGISTER),
+   allowGravatar: toBooleanConfig(process.env.CMD_ALLOW_GRAVATAR),

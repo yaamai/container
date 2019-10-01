@@ -1,0 +1,164 @@
+diff --git a/package.json b/package.json
+index acc4de8..8ccb8b7 100644
+--- a/package.json
++++ b/package.json
+@@ -101,6 +101,7 @@
+     "passport-saml": "^1.0.0",
+     "passport-twitter": "^1.0.4",
+     "passport.socketio": "^3.7.0",
++    "passport-openidconnect": "^0.0.2",
+     "pdfobject": "^2.0.201604172",
+     "pg": "^6.1.2",
+     "pg-hstore": "^2.3.2",
+diff --git a/app.js b/app.js
+index db9301413..6a60c6301 100644
+--- a/app.js
++++ b/app.js
+@@ -195,6 +195,7 @@ app.locals.authProviders = {
+   saml: config.isSAMLEnable,
+   oauth2: config.isOAuth2Enable,
+   oauth2ProviderName: config.oauth2.providerName,
++  oidc: config.isOidcEnable,
+   openID: config.isOpenIDEnable,
+   email: config.isEmailEnable,
+   allowEmailRegister: config.allowEmailRegister
+diff --git a/lib/config/default.js b/lib/config/default.js
+index 9e401f384..a43b8f7a0 100644
+--- a/lib/config/default.js
++++ b/lib/config/default.js
+@@ -88,6 +88,15 @@ module.exports = {
+     clientID: undefined,
+     clientSecret: undefined
+   },
++  oidc: {
++	issuer: undefined,
++	authorizationURL: undefined,
++	tokenURL: undefined,
++	clientID: undefined,
++	clientSecret: undefined,
++	userInfoURL: undefined,
++	scope: undefined
++  },
+   facebook: {
+     clientID: undefined,
+     clientSecret: undefined
+diff --git a/lib/config/index.js b/lib/config/index.js
+index cbe6c39c0..c088a4215 100644
+--- a/lib/config/index.js
++++ b/lib/config/index.js
+@@ -120,6 +120,7 @@ config.isMattermostEnable = config.mattermost.clientID && config.mattermost.clie
+ config.isLDAPEnable = config.ldap.url
+ config.isSAMLEnable = config.saml.idpSsoUrl
+ config.isOAuth2Enable = config.oauth2.clientID && config.oauth2.clientSecret
++config.isOidcEnable = config.oidc.clientID && config.oidc.clientSecret
+ config.isPDFExportEnable = config.allowPDFExport
+ 
+ // Check gitlab api version
+diff --git a/lib/web/auth/index.js b/lib/web/auth/index.js
+index 86ab4b28e..226637a6e 100644
+--- a/lib/web/auth/index.js
++++ b/lib/web/auth/index.js
+@@ -44,6 +44,7 @@ if (config.isGoogleEnable) authRouter.use(require('./google'))
+ if (config.isLDAPEnable) authRouter.use(require('./ldap'))
+ if (config.isSAMLEnable) authRouter.use(require('./saml'))
+ if (config.isOAuth2Enable) authRouter.use(require('./oauth2'))
++if (config.isOidcEnable) authRouter.use(require('./oidc'))
+ if (config.isEmailEnable) authRouter.use(require('./email'))
+ if (config.isOpenIDEnable) authRouter.use(require('./openid'))
+ 
+diff --git a/lib/web/auth/oidc/index.js b/lib/web/auth/oidc/index.js
+new file mode 100644
+index 000000000..3c6b33f54
+--- /dev/null
++++ b/lib/web/auth/oidc/index.js
+@@ -0,0 +1,32 @@
++'use strict'
++
++const Router = require('express').Router
++const passport = require('passport')
++const OidcStrategy = require('passport-openidconnect').Strategy
++const config = require('../../../config')
++const {setReturnToFromReferer, passportGeneralCallback} = require('../utils')
++
++let oidcAuth = module.exports = Router()
++
++passport.use('oidc', new OidcStrategy({
++  issuer: config.oidc.issuer,
++  authorizationURL: config.oidc.authorizationURL,
++  tokenURL: config.oidc.tokenURL,
++  userInfoURL: config.oidc.userInfoURL,
++  clientID: config.oidc.clientID,
++  clientSecret: config.oidc.clientSecret,
++  callbackURL: config.serverURL + '/auth/oidc/callback',
++  scope: config.oidc.scope
++}, passportGeneralCallback))
++
++oidcAuth.get('/auth/oidc', function (req, res, next) {
++  setReturnToFromReferer(req)
++  passport.authenticate('oidc')(req, res, next)
++})
++
++oidcAuth.get('/auth/oidc/callback',
++  passport.authenticate('oidc', {
++    successReturnToOrRedirect: config.serverURL + '/',
++    failureRedirect: config.serverURL + '/'
++  })
++)
+diff --git a/public/views/index/body.ejs b/public/views/index/body.ejs
+index a5e591efd..b5527de52 100644
+--- a/public/views/index/body.ejs
++++ b/public/views/index/body.ejs
+@@ -15,7 +15,7 @@
+                                 <% if (allowAnonymous) { %>
+                                 <a type="button" href="<%- serverURL %>/new" class="btn btn-sm btn-primary"><i class="fa fa-plus"></i> <%= __('New guest note') %></a>
+                                 <% } %>
+-                                <% if (authProviders.facebook || authProviders.twitter || authProviders.github || authProviders.gitlab || authProviders.mattermost || authProviders.dropbox || authProviders.google || authProviders.ldap || authProviders.saml || authProviders.oauth2 || authProviders.email) { %>
++                                <% if (authProviders.facebook || authProviders.twitter || authProviders.github || authProviders.gitlab || authProviders.mattermost || authProviders.dropbox || authProviders.google || authProviders.ldap || authProviders.saml || authProviders.oauth2 || authProviders.oidc || authProviders.email) { %>
+                                 <button class="btn btn-sm btn-success ui-signin" data-toggle="modal" data-target=".signin-modal"><%= __('Sign In') %></button>
+                                 <% } %>
+                             </div>
+@@ -50,7 +50,7 @@
+                     <% if (errorMessage && errorMessage.length > 0) { %>
+                     <div class="alert alert-danger" style="max-width: 400px; margin: 0 auto;"><%= errorMessage %></div>
+                     <% } %>
+-                    <% if (authProviders.facebook || authProviders.twitter || authProviders.github || authProviders.gitlab || authProviders.mattermost || authProviders.dropbox || authProviders.google || authProviders.ldap || authProviders.saml || authProviders.oauth2 || authProviders.email) { %>
++                    <% if (authProviders.facebook || authProviders.twitter || authProviders.github || authProviders.gitlab || authProviders.mattermost || authProviders.dropbox || authProviders.google || authProviders.ldap || authProviders.saml || authProviders.oauth2 || authProviders.oidc || authProviders.email) { %>
+                     <span class="ui-signin">
+                         <br>
+                         <a type="button" class="btn btn-lg btn-success ui-signin" data-toggle="modal" data-target=".signin-modal" style="min-width: 200px;"><%= __('Sign In') %></a>
+diff --git a/public/views/shared/signin-modal.ejs b/public/views/shared/signin-modal.ejs
+index d46b8d548..98a420cf9 100644
+--- a/public/views/shared/signin-modal.ejs
++++ b/public/views/shared/signin-modal.ejs
+@@ -53,7 +53,12 @@
+                     <i class="fa fa-mail-forward"></i> <%= __('Sign in via %s', authProviders.oauth2ProviderName || 'OAuth2') %>
+                 </a>
+                 <% } %>
+-                <% if ((authProviders.facebook || authProviders.twitter || authProviders.github || authProviders.gitlab || authProviders.mattermost || authProviders.dropbox || authProviders.google || authProviders.saml || authProviders.oauth2) && authProviders.ldap) { %>
++                <% if (authProviders.oidc) { %>
++                <a href="<%- serverURL %>/auth/oidc" class="btn btn-lg btn-block btn-social btn-soundcloud">
++                    <i class="fa fa-mail-forward"></i> <%= __('Sign in via %s', authProviders.oidcProviderName || 'OpenID Connect') %>
++                </a>
++                <% } %>
++                <% if ((authProviders.facebook || authProviders.twitter || authProviders.github || authProviders.gitlab || authProviders.mattermost || authProviders.dropbox || authProviders.google || authProviders.saml || authProviders.oauth2 || authProviders.oidc) && authProviders.ldap) { %>
+                 <hr>
+                 <% }%>
+                 <% if (authProviders.ldap) { %>
+@@ -78,7 +83,7 @@
+                     </div>
+                 </form>
+                 <% } %>
+-                <% if ((authProviders.facebook || authProviders.twitter || authProviders.github || authProviders.gitlab || authProviders.mattermost || authProviders.dropbox || authProviders.google || authProviders.ldap || authProviders.oauth2) && authProviders.openID) { %>
++                <% if ((authProviders.facebook || authProviders.twitter || authProviders.github || authProviders.gitlab || authProviders.mattermost || authProviders.dropbox || authProviders.google || authProviders.ldap || authProviders.oauth2 || authProviders.oidc) && authProviders.openID) { %>
+                 <hr>
+                 <% }%>
+                 <% if (authProviders.openID) { %>
+@@ -97,7 +102,7 @@
+                     </div>
+                 </form>
+                 <% } %>
+-                <% if ((authProviders.facebook || authProviders.twitter || authProviders.github || authProviders.gitlab || authProviders.mattermost || authProviders.dropbox || authProviders.google || authProviders.ldap || authProviders.oauth2 || authProviders.openID) && authProviders.email) { %>
++                <% if ((authProviders.facebook || authProviders.twitter || authProviders.github || authProviders.gitlab || authProviders.mattermost || authProviders.dropbox || authProviders.google || authProviders.ldap || authProviders.oauth2 || authProviders.oidc || authProviders.openID) && authProviders.email) { %>
+                 <hr>
+                 <% }%>
+                 <% if (authProviders.email) { %>

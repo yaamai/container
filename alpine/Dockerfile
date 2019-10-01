@@ -49,14 +49,17 @@ RUN set -ex; \
 
 # Add configuraton files
 COPY resources/config.json resources/.sequelizerc /files/
+COPY oidc-config.patch /files/
+COPY 1135.diff /files/
 
 # Install all dependencies and build project
-RUN apk add --no-cache --virtual .dep build-base openssl-dev python git jq bash && \
+RUN apk add --no-cache --virtual .dep build-base openssl-dev python git jq bash curl && \
     # Clone the source
     git clone --depth 1 --branch "$VERSION" "$CODIMD_REPOSITORY" /codimd && \
-    curl -Lo- https://patch-diff.githubusercontent.com/raw/hackmdio/codimd/pull/1135.diff | patch -p1 && \
     # Print the cloned version and clean up git files
     cd /codimd && \
+    cat /files/1135.diff | patch -p1 && \
+    cat /files/oidc-config.patch | patch -p1 && \
     git log --pretty=format:'%ad %h %d' --abbrev-commit --date=short -1 && echo && \
     git rev-parse HEAD > /tmp/gitref && \
     rm -rf /codimd/.git && \
