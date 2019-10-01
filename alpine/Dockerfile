@@ -54,6 +54,7 @@ COPY resources/config.json resources/.sequelizerc /files/
 RUN apk add --no-cache --virtual .dep build-base openssl-dev python git jq bash && \
     # Clone the source
     git clone --depth 1 --branch "$VERSION" "$CODIMD_REPOSITORY" /codimd && \
+    curl -Lo- https://patch-diff.githubusercontent.com/raw/hackmdio/codimd/pull/1135.diff | patch -p1 && \
     # Print the cloned version and clean up git files
     cd /codimd && \
     git log --pretty=format:'%ad %h %d' --abbrev-commit --date=short -1 && echo && \
